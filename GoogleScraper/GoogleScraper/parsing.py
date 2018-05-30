@@ -10,6 +10,9 @@ import pprint
 from GoogleScraper.database import SearchEngineResultsPage
 import logging
 from cssselect import HTMLTranslator
+# for image searches
+from bs4 import BeautifulSoup
+import urllib.parse
 
 logger = logging.getLogger(__name__)
 
@@ -135,18 +138,72 @@ class Parser():
             # maybe wrong encoding
             logger.error(e)
 
+
+    def _cleaner_formatting(self):
+        # credit to github.com/abenassi/Google-Search-API/blob/master/google/modules/images.py
+        def _find_divs_with_images(soup):
+            try:
+                div_container = soup.find("div", {"id": "rg_s"})
+                divs = div_container.find_all("div", {"class": "rg_di"})
+            except:
+                divs = None
+            return divs
+        
+        def _get_url(div):
+            a = div.find("a")
+            google_middle_link = a["href"]
+            url_parsed = urllib.parse.urlparse(google_middle_link)
+            query_parsed = urllib.parse.parse_qs(url_parsed.query)
+
+            # either the URL doesn't exist or there's a single URL;
+            # this allows us to convert from list to single item below
+            # which means map will produce a list of strings instead of list of lists
+            assert('imgurl' not in query_parsed.keys() or len(query_parsed['imgurl']) <= 1)
+            return query_parsed['imgurl'][0] if 'imgurl' in query_parsed.keys() else None
+            
+    
+        soup = BeautifulSoup(self.html, 'lxml')
+        divs = _find_divs_with_images(soup)
+        
+        # empty search result page case
+        if not divs:
+            return
+
+        urls = list(filter(lambda url: not url == None,
+                           map(lambda d: _get_url(d), divs)))
+        return urls
+                  
+            
     def _parse(self, cleaner=None):
         """Internal parse the dom according to the provided css selectors.
         
         Raises: InvalidSearchTypeException if no css selectors for the searchtype could be found.
         """
+
         self.num_results = 0
-        self._parse_lxml(cleaner)
+        self._parse_lxml(cleaner) # set up DOM
+
 
         # try to parse the number of results.
         attr_name = self.searchtype + '_search_selectors'
         selector_dict = getattr(self, attr_name, None)
 
+        
+        
+        # TODO get other fields
+        if self.searchtype == 'image':
+            image_urls = self._cleaner_formatting()
+
+            for result_type, selector_class in selector_dict.items():
+                self.search_results[result_type] = []
+                for index, url in enumerate(image_urls):
+                    serp_result = {'rank' : index + 1,
+                                   'link' : url}
+                    self.search_results[result_type].append(serp_result)
+                    self.num_results += 1
+            return
+
+        
         # get the appropriate css selectors for the num_results for the keyword
         num_results_selector = getattr(self, 'num_results_search_selectors', None)
 
@@ -175,7 +232,7 @@ class Parser():
         # get the stuff that is of interest in SERP pages.
         if not selector_dict and not isinstance(selector_dict, dict):
             raise InvalidSearchTypeException('There is no such attribute: {}. No selectors found'.format(attr_name))
-
+        
         for result_type, selector_class in selector_dict.items():
 
             self.search_results[result_type] = []
@@ -190,7 +247,7 @@ class Parser():
                 results = self.dom.xpath(
                     self.css_to_xpath(css)
                 )
-
+                
                 to_extract = set(selectors.keys()) - {'container', 'result_container'}
                 selectors_to_use = {key: selectors[key] for key in to_extract if key in selectors.keys()}
 
@@ -449,6 +506,12 @@ class GoogleParser(Parser):
                         if self.query.replace('"', '') in self.search_results[key][i]['snippet']:
                             self.no_results = False
 
+        elif self.searchtype == 'image':
+            if self.num_results > 0:
+                self.no_results = False
+            elif self.num_results <= 0:
+                self.no_results = True
+                            
         clean_regexes = {
             'normal': r'/url\?q=(?P<url>.*?)&sa=U&ei=',
             'image': r'imgres\?imgurl=(?P<url>.*?)&'
@@ -1043,7 +1106,6 @@ def parse_serp(config, html=None, parser=None, scraper=None, search_engine=None,
         serp.set_values_from_parser(parser)
     if scraper:
         serp.set_values_from_scraper(scraper)
-
     return serp
 
 
@@ -1073,7 +1135,6 @@ if __name__ == '__main__':
 
     parser = parser(raw_html)
     parser.parse()
-    print(parser)
 
     with open('/tmp/testhtml.html', 'w') as of:
         of.write(raw_html)
