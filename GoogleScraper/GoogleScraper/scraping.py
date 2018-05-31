@@ -161,14 +161,7 @@ class SearchEngineScrape(metaclass=abc.ABCMeta):
         self.search_engine_name = self.search_engine_name.lower()
 
 
-        # TODO update the search_type; why is there search_type and scraping -> search_type?
-        if not search_type:
-            self.search_type = self.config.get('search_type', 'normal')
-        else:
-            self.search_type = search_type
-
-        # TODO remove this being manually set
-        self.self_type = 'image'
+        self.search_type = self.config.get('search_type', 'normal') if not search_type else search_type
             
         self.jobs = jobs
 

@@ -38,20 +38,28 @@ def get_config(command_line_args=None, external_configuration_file=None, config_
     """
 
     config = GoogleScraper.scrape_config
-
-    external_configuration_file = 'GoogleScraper/GoogleScraper/scrape_config.py'
     
     def update_members(d):
         for k, v in d.items():
             setattr(config, k, v)
 
+    # TODO external config file
     if external_configuration_file:
         if os.path.exists(external_configuration_file) and external_configuration_file.endswith('.py'):
-            external_config = load_source('external_config', external_configuration_file)
-            members = inspect.getmembers(external_config)
-            print(type(members))
-            exit()
-            update_members(members)
+            with open(external_configuration_file, 'r') as f:
+                lines = filter(lambda l: not re.match('#.*', l) and re.match('.* = .*', l),
+                               f.readlines())
+                print(lines)
+                exit()
+            
+            # external_config = load_source('external_config', external_configuration_file)
+            # members = inspect.getmembers(external_config)
+            # print(members)
+            # exit()
+            # members_as_dict = {k:v for k, v in members}
+            # print(members_as_dict.keys())
+            # exit()
+            # update_members(members)
 
     if command_line_args:
         update_members(command_line_args)

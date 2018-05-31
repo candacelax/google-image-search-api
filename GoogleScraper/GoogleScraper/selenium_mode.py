@@ -30,6 +30,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# TODO improve the way we get this path
+DRIVER_PATH = os.path.abspath('GoogleScraper/chromedriver')
 
 def get_selenium_scraper_by_search_engine_name(config, search_engine_name, *args, **kwargs):
     """Get the appropriate selenium scraper for the given search engine name.
@@ -221,8 +223,6 @@ class SelScrape(SearchEngineScrape, threading.Thread):
                 self.webdriver = webdriver.Chrome(chrome_options=chrome_ops)
             else:
                 #self.webdriver = webdriver.Chrome()#service_log_path='/tmp/chromedriver_log.log')
-                # ---- candace TODO make get driver path better
-                DRIVER_PATH = os.path.abspath('GoogleScraper/chromedriver')
                 self.webdriver = webdriver.Chrome(DRIVER_PATH)
             return True
         except WebDriverException as e:
@@ -331,13 +331,11 @@ class SelScrape(SearchEngineScrape, threading.Thread):
         """Build the search for SelScrapers"""
         assert self.webdriver, 'Webdriver needs to be ready to build the search'
 
-        # TODO fix this
         if self.config.get('search_type', 'normal') == 'image':
             starting_point = self.image_search_locations[self.search_engine_name]
         else:
             starting_point = self.base_search_url
             
-        starting_point = self.image_search_locations[self.search_engine_name]
         self.webdriver.get(starting_point)
 
     def _get_search_param_values(self):
@@ -453,23 +451,20 @@ class SelScrape(SearchEngineScrape, threading.Thread):
             The element that needs to be clicked to get to the next page or a boolean value to
             indicate an error condition.
         """
-        # if self.search_type == 'normal':
-        #     selector = self.next_page_selectors[self.search_engine_name]
-        #     try:
-        #         # wait until the next page link is clickable
-        #         WebDriverWait(self.webdriver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, selector)))
-        #     except (WebDriverException, TimeoutException) as e:
-        #         self._save_debug_screenshot()
-        #         raise Exception('{}: Cannot locate next page element: {}'.format(self.name, str(e)))
+        if self.search_type == 'normal':
+            selector = self.next_page_selectors[self.search_engine_name]
+            try:
+                # wait until the next page link is clickable
+                WebDriverWait(self.webdriver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, selector)))
+            except (WebDriverException, TimeoutException) as e:
+                self._save_debug_screenshot()
+                raise Exception('{}: Cannot locate next page element: {}'.format(self.name, str(e)))
 
-        #     return self.webdriver.find_element_by_css_selector(selector)
+            return self.webdriver.find_element_by_css_selector(selector)
 
-        # elif self.search_type == 'image':
-        #     self.page_down()
-        #     return True
-
-        self.page_down()
-        return True
+        elif self.search_type == 'image':
+            self.page_down()
+            return True
         
     def wait_until_serp_loaded(self):
         """
@@ -478,45 +473,42 @@ class SelScrape(SearchEngineScrape, threading.Thread):
         We know that the correct page is loaded when self.page_number appears
         in the navigation of the page.
         """
-        ##### HERE
-        # if self.search_type == 'normal':
+        if self.search_type == 'normal':
+            if self.search_engine_name == 'google':
+                selector = '#navcnt td.cur'
+            elif self.search_engine_name == 'yandex':
+                selector = '.pager__item_current_yes font font'
+            elif self.search_engine_name == 'bing':
+                selector = 'nav li a.sb_pagS'
+            elif self.search_engine_name == 'yahoo':
+                selector = '.compPagination strong'
+            elif self.search_engine_name == 'baidu':
+                selector = '#page .fk_cur + .pc'
+            elif self.search_engine_name == 'duckduckgo':
+                # no pagination in duckduckgo
+                pass
+            elif self.search_engine_name == 'ask':
+                selector = '#paging .pgcsel .pg'
 
-        #     if self.search_engine_name == 'google':
-        #         selector = '#navcnt td.cur'
-        #     elif self.search_engine_name == 'yandex':
-        #         selector = '.pager__item_current_yes font font'
-        #     elif self.search_engine_name == 'bing':
-        #         selector = 'nav li a.sb_pagS'
-        #     elif self.search_engine_name == 'yahoo':
-        #         selector = '.compPagination strong'
-        #     elif self.search_engine_name == 'baidu':
-        #         selector = '#page .fk_cur + .pc'
-        #     elif self.search_engine_name == 'duckduckgo':
-        #         # no pagination in duckduckgo
-        #         pass
-        #     elif self.search_engine_name == 'ask':
-        #         selector = '#paging .pgcsel .pg'
+            if self.search_engine_name == 'duckduckgo':
+                time.sleep(1.5)
+            else:
 
-        #     if self.search_engine_name == 'duckduckgo':
-        #         time.sleep(1.5)
-        #     else:
+                try:
+                    WebDriverWait(self.webdriver, 5).\
+            until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, selector), str(self.page_number)))
+                except TimeoutException as e:
+                    self._save_debug_screenshot()
+                    content = self.webdriver.find_element_by_css_selector(selector).text
+                    raise Exception('Pagenumber={} did not appear in navigation. Got "{}" instead'\
+                                    .format(self.page_number), content)
 
-        #         try:
-        #             WebDriverWait(self.webdriver, 5).\
-        #     until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, selector), str(self.page_number)))
-        #         except TimeoutException as e:
-        #             self._save_debug_screenshot()
-        #             content = self.webdriver.find_element_by_css_selector(selector).text
-        #             raise Exception('Pagenumber={} did not appear in navigation. Got "{}" instead'\
-        #                             .format(self.page_number), content)
+        elif self.search_type == 'image':
+            self.wait_until_title_contains_keyword()
 
-        # elif self.search_type == 'image':
-        #     self.wait_until_title_contains_keyword()
+        else:
+            self.wait_until_title_contains_keyword()
 
-        # else:
-        #     self.wait_until_title_contains_keyword()
-
-        self.wait_until_title_contains_keyword()
 
     def wait_until_title_contains_keyword(self):
         try:
@@ -538,15 +530,16 @@ class SelScrape(SearchEngineScrape, threading.Thread):
             if self.search_input is False and self.config.get('stop_on_detection'):
                 self.status = 'Malicious request detected'
                 return
-
+            
             if self.search_input is False:
                 # @todo: pass status_code
                 self.search_input = self.handle_request_denied()
 
+                
             if self.search_input:
                 self.search_input.clear()
                 time.sleep(.25)
-                
+
                 self.search_param_fields = self._get_search_param_fields()
 
                 if self.search_param_fields:
@@ -574,7 +567,7 @@ class SelScrape(SearchEngineScrape, threading.Thread):
                 except ElementNotVisibleException:
                     time.sleep(2)
                     self.search_input.send_keys(self.query + Keys.ENTER)
-
+                
                 self.requested_at = datetime.datetime.utcnow()
             else:
                 logger.debug('{}: Cannot get handle to the input form for keyword {}.'.format(self.name, self.query))

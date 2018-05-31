@@ -144,7 +144,7 @@ class ShowProgressQueue(threading.Thread):
 
 
 def getKeywords(config):
-    # check either file or config file for keywords
+    # check either file or config dict for keywords
     kwfile = config.get('keyword_file', None)
     if kwfile:
         kwfile = os.path.abspath(kwfile)
@@ -163,17 +163,11 @@ def getKeywords(config):
                 # Clean the keywords of duplicates right in the beginning
                     keywords = set([line.strip() for line in open(kwfile, 'r').read().split('\n') if line.strip()])
     else:
-        # -- candace: fixed keyword issue below
-        # TODO make single script
-        keyword = config.get('SCRAPING').get('keyword')
-        keywords = set(config.get('keywords', []))
-        #keyword = config.get('keyword')
-        #keywords = set(config.get('keywords', []))
-        keywords = [keyword, ] if keyword else keywords
+        keywords = [config.get('keyword'), ] if config.get('keyword') else set(config.get('keywords', []))
 
 
     # if no keywords are provided, just print help
-    if not (keyword or keywords) and not kwfile:
+    if not keywords and not kwfile:
         get_command_line(True)
         print('No keywords to scrape for. '\
               'Please provide either an keyword file (Option: --keyword-file) or specify and '
@@ -352,6 +346,7 @@ def main(return_results=False, parse_cmd_line=True, config_from_dict=None):
     session_cls = get_session(config, scoped=False)
     session = session_cls()
 
+
     # add fixtures
     fixtures(config, session)
 
@@ -456,7 +451,7 @@ def main(return_results=False, parse_cmd_line=True, config_from_dict=None):
                     if worker.is_suitabe(job):
                         worker.add_job(job)
                         break
-                    
+
             threads = []
 
             while not workers.empty():
@@ -475,7 +470,8 @@ def main(return_results=False, parse_cmd_line=True, config_from_dict=None):
             progress_thread.join()
             
         elif method == 'http-async':
-            scheduler = AsyncScrapeScheduler(config, scrape_jobs, cache_manager=cache_manager, session=session, scraper_search=scraper_search,
+            scheduler = AsyncScrapeScheduler(config, scrape_jobs, cache_manager=cache_manager,
+                                             session=session, scraper_search=scraper_search,
                                              db_lock=db_lock)
             scheduler.run()
 

@@ -64,7 +64,6 @@ class ScraperSearch(Base):
 
 class SearchEngineResultsPage(Base):
     __tablename__ = 'serp'
-
     id = Column(Integer, primary_key=True)
     status = Column(String, default='successful')
     search_engine_name = Column(String)
@@ -115,6 +114,7 @@ class SearchEngineResultsPage(Base):
         Args:
             A parser object.
         """
+
         self.num_results_for_query = parser.num_results_for_query
         self.num_results = parser.num_results
         self.effective_query = parser.effective_query
@@ -151,7 +151,6 @@ class SearchEngineResultsPage(Base):
         Args:
             A scraper object.
         """
-
         self.query = scraper.query
         self.search_engine_name = scraper.search_engine_name
         self.scrape_method = scraper.scrape_method

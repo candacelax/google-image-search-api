@@ -1,2 +1,7 @@
 # google-image-search-api
-Builds on github.com/NikolaiT/GoogleScraper; some bugs are fixed, updates made
+Modified [this repo](github.com/NikolaiT/GoogleScraper)<br>
+Some bugs are fixed since parts of the code were deprecated
+
+### setting up chromedriver
+
+###
